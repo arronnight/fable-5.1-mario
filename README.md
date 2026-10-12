@@ -87,6 +87,17 @@ Or just play the hosted version: **https://inonono66.github.io/fable-5.1-mario/*
 | Audio | Tiny sequencer over `OscillatorNode`s — square/triangle waves, note tables in MIDI numbers |
 | Level | Tile map built procedurally with helpers (`pipe(x,h)`, `stairs(...)`, `q(x,y,'mush')`) |
 | Physics | Fixed-timestep loop, tile-based AABB collision, NES-flavored accel/friction constants |
+| Spawns | Camera-trigger thresholds + patrol bounds per enemy (idea from jipham510, see References) |
+| Collision | Swept last-position guards so fast bodies can't tunnel (idea from jipham510 `Tile_Collision`) |
+| Background | Clouds on a 0.5× parallax layer (idea from CharlesStover's `mario.js` controller) |
+
+## References
+
+Mechanics ideas ported (not code — the implementation above stays original,
+single-file, zero-dependency) from these open-source Mario engines:
+
+- **[CharlesStover/super-mario-world-js](https://github.com/CharlesStover/super-mario-world-js)** (JS, MIT-style college project) — redux-style reducer + `Sprite` model with split `collisionX`/`collisionY` handlers, bouncing-fireball model (`verticalVelocity` reset on ground contact), parallax background scrolling at `mario.x / 2`, timer-based enemy spawns. Its Python twin **[CharlesStover/super-mario-world-py](https://github.com/CharlesStover/super-mario-world-py)** documents the same controller/reducer/view architecture.
+- **[jipham510/Super-Mario-World](https://github.com/jipham510/Super-Mario-World)** (vanilla JS + canvas) — OOP `GameObject` + composable behaviors (`AutoMove` patrol limits, `SpawnEnemies` camera triggers, `Stomp` bounce), `Tile_Collision` swept resolution using last-position guards (`getLastRight`/`getLastBottom`), lethal-shell kills-other-enemies logic with kicker i-frames, and JSON range-based level parsing. Our `trigger`/`x1`/`x2` spawn fields, swept guards in `moveX`/`moveY`, shell `noHurt` + kicker `invuln` window, and moving-shell lethality follow these designs.
 
 ## 🤖 Agent Trajectory
 
