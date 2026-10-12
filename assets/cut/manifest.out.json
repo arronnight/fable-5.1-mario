@@ -1,0 +1,379 @@
+{
+ "big_crouch": {
+  "file": "assets/cut/big_crouch.png",
+  "size": [
+   15,
+   27
+  ],
+  "trimmed": [
+   3,
+   129,
+   18,
+   156
+  ]
+ },
+ "big_jump": {
+  "file": "assets/cut/big_jump.png",
+  "size": [
+   21,
+   26
+  ],
+  "trimmed": [
+   202,
+   133,
+   223,
+   159
+  ]
+ },
+ "big_skid": {
+  "file": "assets/cut/big_skid.png",
+  "size": [
+   16,
+   28
+  ],
+  "trimmed": [
+   147,
+   128,
+   163,
+   156
+  ]
+ },
+ "big_stand": {
+  "file": "assets/cut/big_stand.png",
+  "size": [
+   15,
+   27
+  ],
+  "trimmed": [
+   3,
+   129,
+   18,
+   156
+  ]
+ },
+ "big_walk1": {
+  "file": "assets/cut/big_walk1.png",
+  "size": [
+   15,
+   27
+  ],
+  "trimmed": [
+   19,
+   129,
+   34,
+   156
+  ]
+ },
+ "big_walk2": {
+  "file": "assets/cut/big_walk2.png",
+  "size": [
+   16,
+   27
+  ],
+  "trimmed": [
+   35,
+   129,
+   51,
+   156
+  ]
+ },
+ "big_walk3": {
+  "file": "assets/cut/big_walk3.png",
+  "size": [
+   16,
+   27
+  ],
+  "trimmed": [
+   52,
+   129,
+   68,
+   156
+  ]
+ },
+ "fire_crouch": {
+  "file": "assets/cut/fire_crouch.png",
+  "size": [
+   16,
+   16
+  ],
+  "trimmed": [
+   130,
+   222,
+   146,
+   238
+  ]
+ },
+ "fire_jump": {
+  "file": "assets/cut/fire_jump.png",
+  "size": [
+   21,
+   26
+  ],
+  "trimmed": [
+   202,
+   215,
+   223,
+   241
+  ]
+ },
+ "fire_skid": {
+  "file": "assets/cut/fire_skid.png",
+  "size": [
+   16,
+   28
+  ],
+  "trimmed": [
+   147,
+   210,
+   163,
+   238
+  ]
+ },
+ "fire_stand": {
+  "file": "assets/cut/fire_stand.png",
+  "size": [
+   15,
+   27
+  ],
+  "trimmed": [
+   3,
+   211,
+   18,
+   238
+  ]
+ },
+ "fire_walk1": {
+  "file": "assets/cut/fire_walk1.png",
+  "size": [
+   15,
+   27
+  ],
+  "trimmed": [
+   19,
+   211,
+   34,
+   238
+  ]
+ },
+ "fire_walk2": {
+  "file": "assets/cut/fire_walk2.png",
+  "size": [
+   16,
+   27
+  ],
+  "trimmed": [
+   35,
+   211,
+   51,
+   238
+  ]
+ },
+ "fire_walk3": {
+  "file": "assets/cut/fire_walk3.png",
+  "size": [
+   16,
+   27
+  ],
+  "trimmed": [
+   52,
+   211,
+   68,
+   238
+  ]
+ },
+ "fireball1": {
+  "file": "assets/cut/fireball1.png",
+  "size": [
+   21,
+   15
+  ],
+  "trimmed": [
+   76,
+   584,
+   97,
+   599
+  ]
+ },
+ "fireball2": {
+  "file": "assets/cut/fireball2.png",
+  "size": [
+   21,
+   16
+  ],
+  "trimmed": [
+   98,
+   583,
+   119,
+   599
+  ]
+ },
+ "goomba1": {
+  "file": "assets/cut/goomba1.png",
+  "size": [
+   16,
+   15
+  ],
+  "trimmed": [
+   8,
+   25,
+   24,
+   40
+  ]
+ },
+ "goomba2": {
+  "file": "assets/cut/goomba2.png",
+  "size": [
+   16,
+   16
+  ],
+  "trimmed": [
+   56,
+   24,
+   72,
+   40
+  ]
+ },
+ "goomba_flat": {
+  "file": "assets/cut/goomba_flat.png",
+  "size": [
+   16,
+   8
+  ],
+  "trimmed": [
+   104,
+   32,
+   120,
+   40
+  ]
+ },
+ "koopa1": {
+  "file": "assets/cut/koopa1.png",
+  "size": [
+   16,
+   27
+  ],
+  "trimmed": [
+   1,
+   6,
+   17,
+   33
+  ]
+ },
+ "koopa2": {
+  "file": "assets/cut/koopa2.png",
+  "size": [
+   16,
+   27
+  ],
+  "trimmed": [
+   35,
+   6,
+   51,
+   33
+  ]
+ },
+ "shell": {
+  "file": "assets/cut/shell.png",
+  "size": [
+   22,
+   18
+  ],
+  "trimmed": [
+   100,
+   98,
+   122,
+   116
+  ]
+ },
+ "small_die": {
+  "file": "assets/cut/small_die.png",
+  "size": [
+   16,
+   18
+  ],
+  "trimmed": [
+   167,
+   16,
+   183,
+   34
+  ]
+ },
+ "small_jump": {
+  "file": "assets/cut/small_jump.png",
+  "size": [
+   15,
+   19
+  ],
+  "trimmed": [
+   78,
+   16,
+   93,
+   35
+  ]
+ },
+ "small_skid": {
+  "file": "assets/cut/small_skid.png",
+  "size": [
+   15,
+   20
+  ],
+  "trimmed": [
+   62,
+   15,
+   77,
+   35
+  ]
+ },
+ "small_stand": {
+  "file": "assets/cut/small_stand.png",
+  "size": [
+   14,
+   20
+  ],
+  "trimmed": [
+   4,
+   15,
+   18,
+   35
+  ]
+ },
+ "small_walk1": {
+  "file": "assets/cut/small_walk1.png",
+  "size": [
+   14,
+   20
+  ],
+  "trimmed": [
+   19,
+   15,
+   33,
+   35
+  ]
+ },
+ "small_walk2": {
+  "file": "assets/cut/small_walk2.png",
+  "size": [
+   13,
+   20
+  ],
+  "trimmed": [
+   33,
+   15,
+   46,
+   35
+  ]
+ },
+ "small_walk3": {
+  "file": "assets/cut/small_walk3.png",
+  "size": [
+   14,
+   20
+  ],
+  "trimmed": [
+   47,
+   15,
+   61,
+   35
+  ]
+ }
+}

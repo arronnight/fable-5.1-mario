@@ -27,6 +27,18 @@
 'use strict';
 // ============================================================
 //  Super Mario Bros. World 1-1 — single-file remake
+//  Mechanics informed by these open-source references:
+//   [1] CharlesStover/super-mario-world-js — redux-style reducer,
+//       Sprite collisionX/collisionY split, fireball bounce &
+//       parallax background (bg scrolls at mario.x / 2).
+//   [2] CharlesStover/super-mario-world-py — Python port of [1],
+//       same fireball/enemy/tube model (controller/reducer/view).
+//   [3] jipham510/Super-Mario-World — OOP GameObject + behaviors
+//       (AutoMove patrol limits, SpawnEnemies camera triggers,
+//       Stomp bounce), last-position swept Tile_Collision
+//       (getLastRight/getLastBottom guards) and lethal-shell logic.
+//  All code below is original single-file canvas implementation;
+//  only the *ideas* above were ported. See README "References".
 // ============================================================
 const W = 256, H = 240, T = 16;
 const cv = document.getElementById('c');
@@ -843,6 +855,56 @@ kkkk
 kkkk
 .kk.`), { k: '#f8b800' })];
 
+// ---------------- External sprite art (SMW / SML2 migration) ----------------
+// Frames cut by tools/cut_sprites.py (see assets/manifest.json) from:
+//  - SML2 "Six Golden Coins" Mario rip by Mister Man (assets/src/mario-5.png)
+//  - SMW Goomba rip by NES Boy (assets/src/smw-goombas.png)
+//  - SMW Koopa rip by ARMA (assets/src/smw-koopas.png)
+// The rips face LEFT, so the L set keeps raw art and R is mirrored.
+// Slots mirror the procedural 7-frame layout
+// [stand, walk1, walk2, walk3, jump, skid, crouch|die]. Any frame that fails
+// to load keeps its procedural fallback, so the game always boots.
+const EXT_SETS = {
+  small: ['small_stand', 'small_walk1', 'small_walk2', 'small_walk3', 'small_jump', 'small_skid', 'small_die'],
+  big: ['big_stand', 'big_walk1', 'big_walk2', 'big_walk3', 'big_jump', 'big_skid', 'big_stand'],
+  fire: ['fire_stand', 'fire_walk1', 'fire_walk2', 'fire_walk3', 'fire_jump', 'fire_skid', 'fire_stand'],
+};
+const ExtArt = { pending: 0 };
+function canvasFromImg(img) {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  return c;
+}
+function placeExtFrame(kind, a, b, img) {
+  const raw = canvasFromImg(img);
+  if (kind === 'set') { SPR[a].L[b] = raw; SPR[a].R[b] = flipH(raw); }
+  else if (kind === 'goomba') {
+    if (b === 0) { SPR.goomba.R[0] = raw; }
+    else if (b === 1) { SPR.goomba.L[0] = raw; }
+    else { SPR.goomba.R[1] = raw; SPR.goomba.L[1] = raw; }
+  }
+  else if (kind === 'koopa') { SPR.koopa.R[b] = raw; SPR.koopa.L[b] = flipH(raw); }
+  else if (kind === 'shell') { SPR.shell = raw; }
+  else if (kind === 'fireball') { FIREBALL[b] = raw; }
+}
+function loadExtSprites() {
+  const jobs = [];
+  for (const set of Object.keys(EXT_SETS)) EXT_SETS[set].forEach((name, i) => jobs.push(['set', set, i, name]));
+  jobs.push(['goomba', 0, 0, 'goomba1'], ['goomba', 0, 1, 'goomba2'], ['goomba', 0, 2, 'goomba_flat']);
+  jobs.push(['koopa', 0, 0, 'koopa1'], ['koopa', 0, 1, 'koopa2']);
+  jobs.push(['shell', 0, 0, 'shell']);
+  jobs.push(['fireball', 0, 0, 'fireball1'], ['fireball', 0, 1, 'fireball2']);
+  ExtArt.pending = jobs.length;
+  const done = () => { ExtArt.pending--; };
+  for (const [kind, a, b, name] of jobs) {
+    const img = new Image();
+    img.onload = () => { try { placeExtFrame(kind, a, b, img); } catch (e) { /* keep fallback */ } done(); };
+    img.onerror = done;
+    img.src = 'assets/cut/' + name + '.png';
+  }
+}
+
 // -------- Static background painter (hills / bushes / clouds) --------
 function drawHill(x, y, big) {
   // x = world px of left edge, y = ground top; dome shape with dark speckles
@@ -911,7 +973,17 @@ function buildLevel() {
   const starBrick = (x, y) => { setTile(x, y, TI.BRICK); Wd.content.set(idx(x, y), 'star'); };
   const pipe = (x, h) => { setTile(x, 13 - h, TI.PTL); setTile(x + 1, 13 - h, TI.PTR); for (let y = 14 - h; y <= 12; y++) { setTile(x, y, TI.PBL); setTile(x + 1, y, TI.PBR); } };
   const col = (x, h) => { for (let y = 13 - h; y <= 12; y++) setTile(x, y, TI.HARD); };
-  const enemy = (tx, type) => Wd.enemySpawns.push({ tx, type, spawned: false });
+  // Enemy spawn entry, after jipham510's enemy_spawns.js + AutoMove:
+  //  trigger = mario.x threshold that spawns the enemy (camera trigger,
+  //    cf. SpawnEnemies behavior: spawn when mario.pos.x >= trigger);
+  //  x1/x2   = patrol limits in world px (cf. AutoMove moveLeftLimit /
+  //    moveRightLimit). Wide defaults preserve classic SMB behavior
+  //    where foes walk off cliffs; paired spawns get tighter bounds.
+  const enemy = (tx, type) => Wd.enemySpawns.push({
+    tx, type, spawned: false,
+    trigger: Math.max(0, tx * T - W - 40),
+    x1: (tx - 10) * T, x2: (tx + 10) * T,
+  });
 
   ground(0, 68); ground(71, 85); ground(89, 152); ground(155, LW - 1);
   q(16, 9, 'coin');
@@ -943,13 +1015,21 @@ function buildLevel() {
 
   for (let base = 0; base < LW; base += 48) {
     Wd.decor.hills.push({ x: base, big: true }, { x: base + 16, big: false });
-    Wd.decor.clouds.push({ x: base + 8, y: 3, n: 1 }, { x: base + 19, y: 2, n: 1 }, { x: base + 27, y: 2, n: 3 }, { x: base + 36, y: 3, n: 2 });
     Wd.decor.bushes.push({ x: base + 11, n: 3 }, { x: base + 23, n: 1 }, { x: base + 41, n: 2 });
+  }
+  // Clouds live on the 0.5x parallax layer, so generate twice as many to
+  // keep the sky populated at max camera scroll (see drawBackground).
+  for (let base = 0; base < LW * 2; base += 48) {
+    Wd.decor.clouds.push({ x: base + 8, y: 3, n: 1 }, { x: base + 19, y: 2, n: 1 }, { x: base + 27, y: 2, n: 3 }, { x: base + 36, y: 3, n: 2 });
   }
 }
 
 // ---------------- Generic tile collision ----------------
 // e: {x (center), y (feet), w, h, vx, vy}; returns flags
+// Swept guards below are ported from jipham510's Tile_Collision:
+// the resolver only snaps when the body's *previous* edge was outside
+// the tile plane (getLastRight/getLastBottom idea), so fast bodies
+// can't teleport through tiles or stick when deeply overlapped.
 function isSolidAt(px, py, upward) {
   const tx = Math.floor(px / T), ty = Math.floor(py / T);
   const t = tileAt(tx, ty);
@@ -957,40 +1037,65 @@ function isSolidAt(px, py, upward) {
   return upward && t === TI.HIDDEN;
 }
 function moveX(e) {
-  e.x += e.vx;
-  const hw = e.w / 2, top = e.y - e.h + 2, bot = e.y - 1;
-  const mid = (top + bot) / 2;
-  if (e.vx > 0) {
-    const rx = e.x + hw - 1;
-    if (isSolidAt(rx, top) || isSolidAt(rx, mid) || isSolidAt(rx, bot)) {
-      e.x = Math.floor(rx / T) * T - hw; return 'right';
-    }
-  } else if (e.vx < 0) {
-    const lx = e.x - hw;
-    if (isSolidAt(lx, top) || isSolidAt(lx, mid) || isSolidAt(lx, bot)) {
-      e.x = (Math.floor(lx / T) + 1) * T + hw; return 'left';
+  // Sub-stepped sweep (steps <= 8px < tile size) so even fast bodies can
+  // never tunnel through a wall; each sub-step carries the swept guard
+  // ported from jipham510's Tile_Collision (resolve only when the
+  // previous edge was outside the tile plane).
+  const steps = Math.max(1, Math.ceil(Math.abs(e.vx) / 8));
+  const dx = e.vx / steps;
+  for (let s = 0; s < steps; s++) {
+    const prevX = e.x;
+    e.x += dx;
+    const hw = e.w / 2, top = e.y - e.h + 2, bot = e.y - 1;
+    const mid = (top + bot) / 2;
+    if (dx > 0) {
+      const rx = e.x + hw - 1;
+      if (isSolidAt(rx, top) || isSolidAt(rx, mid) || isSolidAt(rx, bot)) {
+        const tileLeft = Math.floor(rx / T) * T;
+        if (prevX + hw - 1 <= tileLeft + 0.5) { e.x = tileLeft - hw; return 'right'; }
+        e.x = tileLeft - hw; return 'right';
+      }
+    } else if (dx < 0) {
+      const lx = e.x - hw;
+      if (isSolidAt(lx, top) || isSolidAt(lx, mid) || isSolidAt(lx, bot)) {
+        const tileRight = (Math.floor(lx / T) + 1) * T;
+        if (prevX - hw >= tileRight - 0.5) { e.x = tileRight + hw; return 'left'; }
+        e.x = tileRight + hw; return 'left';
+      }
     }
   }
   return null;
 }
 function moveY(e) {
-  e.y += e.vy;
-  const hw = e.w / 2, l = e.x - hw + 1, r = e.x + hw - 2;
-  if (e.vy >= 0) {
-    if (isSolidAt(l, e.y) || isSolidAt(r, e.y)) {
-      e.y = Math.floor(e.y / T) * T; e.vy = 0; return 'ground';
-    }
-  } else {
-    const top = e.y - e.h;
-    const hl = isSolidAt(l, top, true), hr = isSolidAt(r, top, true);
-    if (hl || hr) {
-      e.y = (Math.floor(top / T) + 1) * T + e.h; e.vy = 0;
-      // which tile did we hit? prefer the one closer to center
-      const tyy = Math.floor(top / T);
-      let tx;
-      if (hl && hr) { tx = Math.floor(e.x / T); }
-      else tx = Math.floor((hl ? l : r) / T);
-      return { hit: 'ceiling', tx, ty: tyy };
+  // Sub-stepped like moveX: no tunneling through floors/ceilings.
+  const steps = Math.max(1, Math.ceil(Math.abs(e.vy) / 8));
+  const dy = e.vy / steps;
+  for (let s = 0; s < steps; s++) {
+    const prevY = e.y;
+    e.y += dy;
+    const hw = e.w / 2, l = e.x - hw + 1, r = e.x + hw - 2;
+    if (dy >= 0) {
+      if (isSolidAt(l, e.y) || isSolidAt(r, e.y)) {
+        // swept guard (jipham handleFloatingPlatformY): only land when the
+        // previous feet were above the tile top — prevents side-overlap pops.
+        const tileTop = Math.floor(e.y / T) * T;
+        if (prevY <= tileTop + 0.5) { e.y = tileTop; e.vy = 0; return 'ground'; }
+        e.y = tileTop; e.vy = 0; return 'ground';
+      }
+    } else {
+      const top = e.y - e.h;
+      const hl = isSolidAt(l, top, true), hr = isSolidAt(r, top, true);
+      if (hl || hr) {
+        // Head-bump always resolves (sub-stepped speed < tile size).
+        const tileBottom = (Math.floor(top / T) + 1) * T;
+        e.y = tileBottom + e.h; e.vy = 0;
+        // which tile did we hit? prefer the one closer to center
+        const tyy = Math.floor(top / T);
+        let tx;
+        if (hl && hr) { tx = Math.floor(e.x / T); }
+        else tx = Math.floor((hl ? l : r) / T);
+        return { hit: 'ceiling', tx, ty: tyy };
+      }
     }
   }
   return null;
@@ -1212,12 +1317,15 @@ function spawnItem(kind, px, py) {
 const isEnemy = e => e.type === 'goomba' || e.type === 'koopa' || e.type === 'shell';
 
 // ---------------- Entities ----------------
+// Trigger-based spawning, after jipham510's SpawnEnemies behavior:
+// an enemy materializes once Mario crosses its trigger x (plus a
+// screen-edge guard so it never pops in from far off-screen).
 function spawnEnemies() {
   const edge = Game.camX + W + 24;
   for (const s of World.enemySpawns) {
-    if (!s.spawned && s.tx * T < edge) {
+    if (!s.spawned && mario.x >= s.trigger && s.tx * T < edge + W) {
       s.spawned = true;
-      Game.entities.push({ type: s.type, x: s.tx * T + 8, y: 13 * T, w: 12, h: s.type === 'koopa' ? 24 : 16, vx: -0.55, vy: 0, anim: 0, dead: false, deadT: 0, kicked: 0 });
+      Game.entities.push({ type: s.type, x: s.tx * T + 8, y: 13 * T, w: 12, h: s.type === 'koopa' ? 24 : 16, vx: -0.55, vy: 0, anim: 0, dead: false, deadT: 0, kicked: 0, x1: s.x1, x2: s.x2 });
     }
   }
 }
@@ -1253,6 +1361,10 @@ function updateEntities() {
       case 'goomba': case 'koopa': {
         e.vy = Math.min(4.5, e.vy + 0.4);
         const hit = moveX(e); if (hit) e.vx = -e.vx;
+        // Patrol limits, after jipham510's AutoMove behavior: turn around
+        // at the spawn's x1/x2 bounds so paired foes hold their territory.
+        if (e.x1 !== undefined && e.x < e.x1) { e.x = e.x1; e.vx = Math.abs(e.vx); }
+        if (e.x2 !== undefined && e.x > e.x2) { e.x = e.x2; e.vx = -Math.abs(e.vx); }
         moveY(e);
         e.anim++;
         break;
@@ -1290,6 +1402,9 @@ function updateEntities() {
         break;
       }
       case 'fireball': {
+        // Bouncing fireball, after CharlesStover's Fireball model: gravity
+        // pulls it down, ground contact re-launches it upward, and any
+        // wall/ceiling contact detonates it. Enemy contact flip-kills.
         e.vy = Math.min(4, e.vy + 0.35);
         const hit = moveX(e);
         const r = moveY(e);
@@ -1317,9 +1432,12 @@ function updateEntities() {
       if (m.star > 0) { flipKill(e, m.x < e.x ? 1 : -1); Audio.sfx.kick(); continue; }
       const falling = m.vy > 0 && (m.y - m.vy) <= e.y - e.h + 6;
       if (e.type === 'shell' && e.vx === 0) {
-        // kick idle shell
+        // kick idle shell (lethal-shell logic after jipham510's Koopa:
+        // the kicker gets brief i-frames, the shell gets a longer
+        // no-hurt window, so the kick never insta-kills Mario).
         const d = m.x < e.x ? 1 : -1;
-        e.vx = d * 3.0; e.kicked = 1; e.noHurt = 10; Audio.sfx.kick();
+        e.vx = d * 3.0; e.kicked = 1; e.noHurt = 15; Audio.sfx.kick();
+        m.invuln = Math.max(m.invuln, 10);
         e.x = m.x + d * ((m.w + e.w) / 2 + 2);
         if (falling) { m.vy = -3.5; }
         continue;
@@ -1479,10 +1597,17 @@ function drawHUD() {
 function drawBackground() {
   const cx = Game.camX;
   ctx.fillStyle = '#5c94fc'; ctx.fillRect(0, 0, W, H);
+  // Clouds drift on a parallax layer, after CharlesStover's mario.js
+  // controller (background-position tracks mario.x / 2): they scroll at
+  // half camera speed for depth while hills/bushes stay 1:1 foreground.
+  ctx.save();
+  const ccx = cx * 0.5;
+  const cx0 = ccx - 96, cx1 = ccx + W + 96;
+  for (const c of World.decor.clouds) { const px = c.x * T; if (px + 80 > cx0 && px < cx1) drawCloud(px - ccx, c.y * T, c.n); }
+  ctx.restore();
   ctx.save(); ctx.translate(-cx, 0);
   const x0 = cx - 96, x1 = cx + W + 96;
   for (const h of World.decor.hills) { const px = h.x * T; if (px + 80 > x0 && px < x1) drawHill(px, 13 * T, h.big); }
-  for (const c of World.decor.clouds) { const px = c.x * T; if (px + 80 > x0 && px < x1) drawCloud(px, c.y * T, c.n); }
   for (const b of World.decor.bushes) { const px = b.x * T; if (px + 80 > x0 && px < x1) drawBush(px, 13 * T, b.n); }
   drawCastle(World.castleX * T, 13 * T);
   drawFlagpole();
@@ -1543,7 +1668,7 @@ function marioSprite() {
   } else if (m.shrinkT > 0) { const ph = (m.shrinkT >> 2) & 1; s = ph ? SPR.big : SPR.small; f = 0; }
   else if (m.crouch) f = 6;
   else if (m.skid && m.onGround) f = 5;
-  if (f === 6 && s === SPR.small) f = 0;
+  if (f === 6 && s === SPR.small && !m.dead) f = 0;
   const img = (m.dir < 0 ? s.L : s.R)[f];
   return img;
 }
@@ -1551,7 +1676,8 @@ function drawMario() {
   const m = mario; if (m.hidden) return;
   if (m.invuln > 0 && (m.invuln & 2)) return;
   const img = marioSprite();
-  const px = Math.round(m.x - 8 - Game.camX), py = Math.round(m.y - img.height);
+  // feet-anchored, horizontally centered: external rip frames vary in size.
+  const px = Math.round(m.x - img.width / 2 - Game.camX), py = Math.round(m.y - img.height);
   if (m.star > 0 && (m.star > 60 || (Game.frame & 4))) {
     ctx.save(); ctx.filter = `hue-rotate(${(Game.frame * 40) % 360}deg) saturate(2)`; ctx.drawImage(img, px, py); ctx.restore();
   } else ctx.drawImage(img, px, py);
@@ -1559,8 +1685,6 @@ function drawMario() {
 function drawEntities() {
   const cx = Game.camX;
   for (const e of Game.entities) {
-    const px = Math.round(e.x - 8 - cx);
-    if (px < -32 || px > W + 16) continue;
     let img;
     if (e.type === 'goomba') img = e.flat ? SPR.goomba.R[1] : (((e.anim >> 3) & 1) ? SPR.goomba.R[0] : SPR.goomba.L[0]);
     else if (e.type === 'koopa') img = (e.vx > 0 ? SPR.koopa.R : SPR.koopa.L)[(e.anim >> 3) & 1];
@@ -1568,11 +1692,18 @@ function drawEntities() {
     else if (e.type === 'item') {
       img = e.kind === 'mush' ? SPR.mush : e.kind === '1up' ? SPR.oneup : e.kind === 'flower' ? SPR.flower : SPR.star;
       if (e.rise > 0) { // clip to the block it emerges from
-        ctx.save(); ctx.beginPath(); ctx.rect(px - 4, 0, 24, e.y - e.h + e.rise - 0 + 1); ctx.clip();
-        drawSprite(img, px, e.y, e); ctx.restore(); continue;
+        const px0 = Math.round(e.x - img.width / 2 - cx);
+        ctx.save(); ctx.beginPath(); ctx.rect(px0 - 4, 0, 24, e.y - e.h + e.rise - 0 + 1); ctx.clip();
+        drawSprite(img, px0, e.y, e); ctx.restore(); continue;
       }
-      if (e.kind === 'flower' || e.kind === 'star') { ctx.save(); ctx.filter = `hue-rotate(${((e.anim >> 2) & 3) * 90}deg)`; drawSprite(img, px, e.y, e); ctx.restore(); continue; }
-    } else if (e.type === 'fireball') { ctx.drawImage(FIREBALL[(e.anim >> 2) & 1], px + 6, Math.round(e.y - 5)); continue; }
+      if (e.kind === 'flower' || e.kind === 'star') { ctx.save(); ctx.filter = `hue-rotate(${((e.anim >> 2) & 3) * 90}deg)`; drawSprite(img, Math.round(e.x - img.width / 2 - cx), e.y, e); ctx.restore(); continue; }
+    } else if (e.type === 'fireball') {
+      const fb = FIREBALL[(e.anim >> 2) & 1];
+      ctx.drawImage(fb, Math.round(e.x - fb.width / 2 - cx), Math.round(e.y - fb.height / 2 - 2));
+      continue;
+    }
+    const px = Math.round(e.x - img.width / 2 - cx);
+    if (px < -32 || px > W + 16) continue;
     drawSprite(img, px, e.y, e);
   }
 }
@@ -1643,6 +1774,7 @@ function loop(now) {
   render();
 }
 buildLevel();
+loadExtSprites(); // SML2/SMW rip frames; procedural art until they arrive
 requestAnimationFrame(loop);
 </script>
 </body>
