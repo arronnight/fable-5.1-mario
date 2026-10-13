@@ -90,6 +90,10 @@ Or just play the hosted version: **https://inonono66.github.io/fable-5.1-mario/*
 | Spawns | Camera-trigger thresholds + patrol bounds per enemy (idea from jipham510, see References) |
 | Collision | Swept last-position guards so fast bodies can't tunnel (idea from jipham510 `Tile_Collision`) |
 | Background | Clouds on a 0.5× parallax layer (idea from CharlesStover's `mario.js` controller) |
+| SMW enemies | Bullet Bill (gravity-free flyer, stomp grounds it, bursts on landing) and Dragon (2-hit dino: half-flatten + speeds up, then flat) — behaviors after jipham510's `Bullet.js`/`Dragon.js`, sprites hand-encoded to match |
+| Build mode | `Shift+Click` places a 2-wide pipe at the cursor (height follows click row) — after CharlesStover's `ADD_TUBE` click handler; only builds on empty tiles |
+| Level data | Ground stretches + spawn list live in one `LEVEL_DATA` table (ground ranges, `[tx, type, row]` spawns) — after jipham510's JSON range level parser |
+| True physics | Walk 1.25 / run 2.25 / sprint 3.0 px/f caps, P-meter (−1/+2, full at 112), speed-indexed jump table (−5.0…−6.06), held/released gravity 0.19/0.375, terminal 4.0, stomp bounce −3.0/−5.5 — exact values from the [galaxyhaxz/smw-src](https://github.com/galaxyhaxz/smw-src) disassembly (`player.s` tables `DATA_00D535`/`00D5EB`/`00D2BD`/`00D7A5`/`00D7AF`, `BoostMarioSpeed`) |
 
 ## References
 

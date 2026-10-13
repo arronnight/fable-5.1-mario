@@ -16,7 +16,7 @@
 </head>
 <body>
 <div id="wrap"><canvas id="c" width="256" height="240"></canvas></div>
-<div id="help">← → 이동 · Z / Shift 달리기(불꽃) · X / Space / ↑ 점프 · ↓ 앉기 · Enter 시작/일시정지 · M 음소거</div>
+<div id="help">← → 이동 · Z / Shift 달리기(불꽃) · X / Space / ↑ 점프 · ↓ 앉기 · Enter 시작/일시정지 · M 음소거 · Shift+클릭 파이프 설치</div>
 <div id="touch">
   <div class="tb" data-k="left" style="left:16px">◀</div>
   <div class="tb" data-k="right" style="left:96px">▶</div>
@@ -26,17 +26,29 @@
 <script>
 'use strict';
 // ============================================================
-//  Super Mario Bros. World 1-1 — single-file remake
+//  Super Mario Bros. World 1-1 — single-file remake + SMW pack
 //  Mechanics informed by these open-source references:
 //   [1] CharlesStover/super-mario-world-js — redux-style reducer,
-//       Sprite collisionX/collisionY split, fireball bounce &
-//       parallax background (bg scrolls at mario.x / 2).
+//       Sprite collisionX/collisionY split, fireball bounce,
+//       parallax background (bg scrolls at mario.x / 2), and
+//       click-to-place tubes (ADD_TUBE: mouse click builds a tube
+//       at the click location — ported here as Shift+Click pipes).
 //   [2] CharlesStover/super-mario-world-py — Python port of [1],
 //       same fireball/enemy/tube model (controller/reducer/view).
 //   [3] jipham510/Super-Mario-World — OOP GameObject + behaviors
 //       (AutoMove patrol limits, SpawnEnemies camera triggers,
-//       Stomp bounce), last-position swept Tile_Collision
-//       (getLastRight/getLastBottom guards) and lethal-shell logic.
+//       Stomp bounce, IgnoreGravity flyers), last-position swept
+//       Tile_Collision (getLastRight/getLastBottom guards),
+//       lethal-shell logic, JSON range level parsing (ported here
+//       as LEVEL_DATA), and enemies: Bullet (gravity-free flyer,
+//       stomp-grounds-it) and Dragon (2-hit dino: half-flatten +
+//       speed-up, then flat). MysteryBox maps to our Q-block +
+//       content system.
+//   [4] galaxyhaxz/smw-src — binary-exact SMW disassembly, used for the
+//       true movement constants: speed caps DATA_00D535, P-meter
+//       DATA_00D5EB + CODE_00D968, jump table DATA_00D2BD, gravity
+//       DATA_00D7A5, terminal DATA_00D7AF, stomp bounce BoostMarioSpeed,
+//       all in project/mw_e10/player.s (+ sprite_1-main.s).
 //  All code below is original single-file canvas implementation;
 //  only the *ideas* above were ported. See README "References".
 // ============================================================
@@ -85,7 +97,11 @@ for (const el of document.querySelectorAll('.tb')) {
   el.addEventListener('pointerdown', on); el.addEventListener('pointerup', off);
   el.addEventListener('pointercancel', off); el.addEventListener('pointerleave', off);
 }
-cv.addEventListener('pointerdown', () => { Audio.unlock(); pressed.start = true; });
+cv.addEventListener('pointerdown', e => {
+  Audio.unlock();
+  if (e.shiftKey && Game.state === 'play' && !Game.paused) { placePipeFromEvent(e); return; }
+  pressed.start = true;
+});
 
 // ---------------- Audio (tiny synth) ----------------
 const Audio = (() => {
@@ -599,6 +615,94 @@ const SHELL = L(`
 ................
 ................
 ................`);
+// SMW pack: Bullet Bill (flies straight, gravity-free — after jipham510's
+// Bullet.js: IgnoreGravity + AutoMove, stompable once then it drops).
+const BULLET = L(`
+.....kkkkkk.....
+...kkkkkkkkkk...
+..kkkkkkkkkkkk..
+..kkwwkkkkwwkk..
+..kkwkkkkkkwkk..
+..kkkkkkkkkkkk..
+kkkkkkkkkkkkkkkk
+kkkkkkkkkkkkkkkk
+..kkkkkkkkkkkk..
+..kkkkkkkkkkkk..
+...kkkkkkkkkk...
+.....kkkkkk.....`);
+// SMW pack: Dragon (2-hit dino — after jipham510's Dragon.js: first stomp
+// half-flattens + speeds up, second stomp flattens it for good).
+const DRAGON1 = L(`
+......gggg......
+.....gggggg.....
+.....gwwggg.....
+.....gwkggg.....
+.....gggggg.....
+......gggg......
+....gggggggg....
+...gggggggggg...
+..gggggggggggg..
+..gwgggggggggg..
+..gggggggggggg..
+..ggggppppgggg..
+..ggggppppgggg..
+...gggggggggg...
+...gggg..gggg...
+...ppp....ppp...
+..pppp....pppp..
+..pppp....pppp..`);
+const DRAGON2 = L(`
+......gggg......
+.....gggggg.....
+.....gwwggg.....
+.....gwkggg.....
+.....gggggg.....
+......gggg......
+....gggggggg....
+...gggggggggg...
+..gggggggggggg..
+..gwgggggggggg..
+..gggggggggggg..
+..ggggppppgggg..
+..ggggppppgggg..
+...gggggggggg...
+...gggg..gggg...
+....ppp...ppp...
+....pppp..pppp..
+....pppp..pppp..`);
+const DRAGONH1 = L(`
+................
+......gggg......
+.....gggggg.....
+.....gwwggg.....
+.....gwkggg.....
+.....gggggg.....
+....gggggggg....
+..gggggggggggg..
+..ggggppppgggg..
+...gggggggggg...
+...ppp....ppp...
+..pppp....pppp..`);
+const DRAGONH2 = L(`
+................
+......gggg......
+.....gggggg.....
+.....gwwggg.....
+.....gwkggg.....
+.....gggggg.....
+....gggggggg....
+..gggggggggggg..
+..ggggppppgggg..
+...gggggggggg...
+....ppp...ppp...
+....pppp..pppp..`);
+const DRAGONFLAT = L(`
+................
+................
+....gggggggg....
+..gggggggggggg..
+..ggwwggggwwgg..
+..gggggggggggg..`);
 const MUSH = L(`
 .....eeeeee.....
 ...eewweeeewwe..
@@ -837,6 +941,10 @@ const SPR = {
   goomba: set([GOOMBA1, GOOMBA_FLAT]),
   koopa: set([KOOPA1]),
   shell: mk(SHELL),
+  bullet: mk(BULLET),
+  dragon: set([DRAGON1, DRAGON2]),
+  dragonHalf: set([DRAGONH1, DRAGONH2]),
+  dragonFlat: mk(DRAGONFLAT),
   mush: mk(MUSH), oneup: mk(MUSH, PAL, LUIGI1UP), flower: mk(FLOWER), star: mk(STAR),
   coin: [mk(COIN1), mk(COIN2), mk(COIN3), mk(COIN2)],
   ground: mk(GROUND), brick: mk(BRICK), q: mk(QBLOCK), used: mk(USED), hard: mk(HARD), cbrick: mk(CASTLE_BRICK),
@@ -910,6 +1018,50 @@ function tileAt(tx, ty) {
   return World.tiles[idx(tx, ty)];
 }
 function setTile(tx, ty, v) { World.tiles[idx(tx, ty)] = v; }
+// Click-to-place tubes, after CharlesStover's ADD_TUBE reducer (mouse
+// click creates a tube at the click location): Shift+Click drops a 2-wide
+// pipe whose height follows the click row (2-4 tall). Only builds on
+// empty space so the level can't be griefed into an unwinnable state.
+function placePipe(tx, h) {
+  h = Math.max(2, Math.min(4, h | 0));
+  tx = Math.round(tx);
+  if (tx < 1 || tx + 1 >= LW) return false;
+  const top = 13 - h;
+  for (let y = top; y <= 12; y++) {
+    if (tileAt(tx, y) !== TI.EMPTY || tileAt(tx + 1, y) !== TI.EMPTY) return false;
+  }
+  setTile(tx, top, TI.PTL); setTile(tx + 1, top, TI.PTR);
+  for (let y = top + 1; y <= 12; y++) { setTile(tx, y, TI.PBL); setTile(tx + 1, y, TI.PBR); }
+  Game.popups.push({ x: tx * T + 8, y: top * T, t: 0, text: 'PIPE' });
+  return true;
+}
+function placePipeFromEvent(e) {
+  const r = cv.getBoundingClientRect();
+  const gx = (e.clientX - r.left) / r.width * W + Game.camX;
+  const gy = (e.clientY - r.top) / r.height * H;
+  const h = Math.max(2, Math.min(4, 13 - Math.floor(gy / T)));
+  if (placePipe(Math.floor(gx / T), h)) Audio.sfx.appear(); else Audio.sfx.bump();
+}
+
+// Data-driven level table, after jipham510's background_tiles.js JSON
+// ranges ([xStart, xLength, yStart, yLength] runs): the ground stretches
+// and the spawn list below are the single source of truth; buildLevel
+// just interprets them. row = spawn feet row (13 = ground top, smaller
+// = flying, for bullets).
+const LEVEL_DATA = {
+  ground: [[0, 68], [71, 85], [89, 152], [155, LW - 1]],
+  enemies: [
+    [22, 'goomba'], [40, 'goomba'], [51, 'goomba'], [52.5, 'goomba'],
+    [70, 'bullet', 10],
+    [80, 'goomba'], [81.5, 'goomba'], [97, 'goomba'], [98.5, 'goomba'],
+    [107, 'koopa'], [114, 'goomba'], [115.5, 'goomba'],
+    [120, 'dragon'],
+    [124, 'goomba'], [125.5, 'goomba'],
+    [153, 'bullet', 9],
+    [160, 'dragon'],
+    [174, 'goomba'], [175.5, 'goomba'],
+  ],
+};
 
 function buildLevel() {
   const Wd = World;
@@ -929,13 +1081,15 @@ function buildLevel() {
   //  x1/x2   = patrol limits in world px (cf. AutoMove moveLeftLimit /
   //    moveRightLimit). Wide defaults preserve classic SMB behavior
   //    where foes walk off cliffs; paired spawns get tighter bounds.
-  const enemy = (tx, type) => Wd.enemySpawns.push({
+  //  row     = spawn feet tile-row (13 = ground top; bullets fly higher).
+  const enemy = (tx, type, row = 13) => Wd.enemySpawns.push({
     tx, type, spawned: false,
     trigger: Math.max(0, tx * T - W - 40),
+    sy: row * T,
     x1: (tx - 10) * T, x2: (tx + 10) * T,
   });
 
-  ground(0, 68); ground(71, 85); ground(89, 152); ground(155, LW - 1);
+  for (const [a, b] of LEVEL_DATA.ground) ground(a, b);
   q(16, 9, 'coin');
   brick(20, 9); q(21, 9, 'mush'); brick(22, 9); q(23, 9, 'coin'); brick(24, 9); q(22, 5, 'coin');
   pipe(28, 2); pipe(38, 3); pipe(46, 4); pipe(57, 4);
@@ -958,10 +1112,7 @@ function buildLevel() {
   col(189, 8);
   col(Wd.flagX, 1);
 
-  enemy(22, 'goomba'); enemy(40, 'goomba'); enemy(51, 'goomba'); enemy(52.5, 'goomba');
-  enemy(80, 'goomba'); enemy(81.5, 'goomba'); enemy(97, 'goomba'); enemy(98.5, 'goomba');
-  enemy(107, 'koopa'); enemy(114, 'goomba'); enemy(115.5, 'goomba');
-  enemy(124, 'goomba'); enemy(125.5, 'goomba'); enemy(174, 'goomba'); enemy(175.5, 'goomba');
+  for (const [tx, type, row] of LEVEL_DATA.enemies) enemy(tx, type, row);
 
   for (let base = 0; base < LW; base += 48) {
     Wd.decor.hills.push({ x: base, big: true }, { x: base + 16, big: false });
@@ -1067,14 +1218,23 @@ const mario = {
   power: 0,            // 0 small, 1 big, 2 fire
   onGround: false, jumping: false, crouch: false, skid: false,
   invuln: 0, star: 0, anim: 0, animT: 0, dead: false, dieT: 0,
-  growT: 0, shrinkT: 0, fireT: 0, fireballs: 0, pipeT: 0,
+  growT: 0, shrinkT: 0, fireT: 0, fireballs: 0, pipeT: 0, meter: 0,
 };
-const PH = { walkAcc: 0.045, runAcc: 0.07, maxWalk: 1.55, maxRun: 2.6, friction: 0.06, skid: 0.16,
-  gravUp: 0.19, gravDown: 0.5, termV: 4.5 };
+// True SMW run physics, from the galaxyhaxz/smw-src disassembly
+// (units converted from 4.4 fixed-point: 1 unit = 1/16 px/frame):
+//  caps DATA_00D535 (player.s:1823): walk ±20 = 1.25 px/f, run ±36 =
+//  2.25 px/f, sprint ±48 = 3.0 px/f.
+//  gravity DATA_00D7A5 (player.s:2096): jump held 3 = 0.19 px/f²,
+//  released 6 = 0.375 px/f². terminal DATA_00D7AF = 64 = 4.0 px/f.
+//  P-meter DATA_00D5EB (player.s:1851): -1/-1/+2 per frame, cap 112
+//  ($70); +2 only while B held and |speed| >= $23 = 35 (~2.19 px/f),
+//  so 0 -> full takes 56 frames (~0.93 s). Full meter + run = sprint.
+const PH = { walkAcc: 0.045, runAcc: 0.07, maxWalk: 1.25, maxRun: 2.25, maxSprint: 3.0, friction: 0.06, skid: 0.16,
+  gravUp: 0.19, gravDown: 0.375, termV: 4.0, meterMax: 112, meterFast: 2.19 };
 
 function resetMario(full) {
   Object.assign(mario, { x: 40, y: 13 * T, vx: 0, vy: 0, dir: 1, onGround: false, jumping: false, crouch: false, skid: false,
-    invuln: 0, star: 0, anim: 0, animT: 0, dead: false, dieT: 0, growT: 0, shrinkT: 0, fireT: 0, fireballs: 0, pipeT: 0 });
+    invuln: 0, star: 0, anim: 0, animT: 0, dead: false, dieT: 0, growT: 0, shrinkT: 0, fireT: 0, fireballs: 0, pipeT: 0, meter: 0 });
   if (full) mario.power = 0;
   mario.h = mario.power ? 32 : 16;
 }
@@ -1101,9 +1261,14 @@ function addCoin(x, y) {
 function addLife(x, y) { Game.lives++; Audio.sfx.oneup(); Game.popups.push({ x, y, t: 0, text: '1UP' }); }
 
 // ---------------- Mario update ----------------
+// True SMW jump table DATA_00D2BD (player.s:1733): even entries for the
+// normal jump, indexed by (|speedX| >> 2) & ~1 with speed in 1/16px units:
+// -80,-82,-85,-87,-90,-92,-95,-97 -> -5.0..-6.06 px/f. Faster run = higher
+// jump, exactly like the original.
+const JUMP_TAB = [5.0, 5.125, 5.31, 5.44, 5.625, 5.75, 5.94, 6.06];
 function jumpVel() {
-  const s = Math.abs(mario.vx);
-  return s < 1 ? -5.3 : s < 2.2 ? -5.5 : -5.9;
+  const i = Math.min(7, Math.floor(Math.abs(mario.vx) * 4 / 2));
+  return -JUMP_TAB[i];
 }
 function updateMario() {
   const m = mario;
@@ -1126,7 +1291,12 @@ function updateMario() {
 
   // horizontal
   const acc = run ? PH.runAcc : PH.walkAcc;
-  const max = run ? PH.maxRun : PH.maxWalk;
+  // P-meter (CODE_00D968, player.s:2318): +2/frame while running fast,
+  // -1/frame otherwise, clamped 0..112. Full meter + run = sprint cap.
+  if (run && Math.abs(m.vx) >= PH.meterFast) m.meter = Math.min(PH.meterMax, m.meter + 2);
+  else m.meter = Math.max(0, m.meter - 1);
+  const sprinting = run && m.meter >= PH.meterMax;
+  const max = sprinting ? PH.maxSprint : run ? PH.maxRun : PH.maxWalk;
   const prevSpeed = Math.abs(m.vx);
   m.skid = false;
   if (m.crouch && m.onGround) {
@@ -1264,18 +1434,29 @@ function spawnItem(kind, px, py) {
   if (kind === 'mush' && mario.power > 0) kind = 'flower';
   Game.entities.push({ type: 'item', kind, x: px + 8, y: py + 16, w: 12, h: 14, vx: 0, vy: 0, rise: 16, anim: 0 });
 }
-const isEnemy = e => e.type === 'goomba' || e.type === 'koopa' || e.type === 'shell';
+const isEnemy = e => e.type === 'goomba' || e.type === 'koopa' || e.type === 'shell' || e.type === 'bullet' || e.type === 'dragon';
+// Per-type spawn stats for the SMW pack (sizes in px, speeds in px/frame).
+// Bullet: fast, gravity-free flyer (jipham IgnoreGravity). Dragon: slow
+// walker that gets angry (faster) after the first stomp.
+const SPAWN_STATS = {
+  goomba: { w: 12, h: 16, vx: -0.55 },
+  koopa: { w: 12, h: 24, vx: -0.55 },
+  bullet: { w: 14, h: 12, vx: -1.8 },
+  dragon: { w: 14, h: 22, vx: -0.45 },
+};
 
 // ---------------- Entities ----------------
 // Trigger-based spawning, after jipham510's SpawnEnemies behavior:
 // an enemy materializes once Mario crosses its trigger x (plus a
 // screen-edge guard so it never pops in from far off-screen).
+// sy = spawn feet y in px (bullets fly: sy above the ground).
 function spawnEnemies() {
   const edge = Game.camX + W + 24;
   for (const s of World.enemySpawns) {
     if (!s.spawned && mario.x >= s.trigger && s.tx * T < edge + W) {
       s.spawned = true;
-      Game.entities.push({ type: s.type, x: s.tx * T + 8, y: 13 * T, w: 12, h: s.type === 'koopa' ? 24 : 16, vx: -0.55, vy: 0, anim: 0, dead: false, deadT: 0, kicked: 0, x1: s.x1, x2: s.x2 });
+      const st = SPAWN_STATS[s.type] || SPAWN_STATS.goomba;
+      Game.entities.push({ type: s.type, x: s.tx * T + 8, y: s.sy !== undefined ? s.sy : 13 * T, w: st.w, h: st.h, vx: st.vx, vy: 0, anim: 0, dead: false, deadT: 0, kicked: 0, hits: 0, falling: false, x0: s.tx * T + 8, x1: s.x1, x2: s.x2 });
     }
   }
 }
@@ -1287,6 +1468,18 @@ function stompKill(e) {
   if (e.type === 'goomba') { e.dead = true; e.flat = true; e.deadT = 0; e.vx = 0; addScore(100, e.x, e.y - 16); }
   else if (e.type === 'koopa') { e.type = 'shell'; e.h = 16; e.vx = 0; e.kicked = 0; e.idle = 0; addScore(100, e.x, e.y - 16); }
   else if (e.type === 'shell') { if (e.vx !== 0) { e.vx = 0; e.kicked = 0; e.idle = 0; addScore(100, e.x, e.y - 16); } }
+  // SMW pack, after jipham510's Bullet.js: first stomp grounds it (loses
+  // IgnoreGravity/AutoMove, starts falling); a falling bullet is finished.
+  else if (e.type === 'bullet') {
+    if (!e.falling) { e.falling = true; e.vx = 0; e.vy = 1; addScore(200, e.x, e.y - 16); }
+    else { flipKill(e, 1); }
+  }
+  // SMW pack, after jipham510's Dragon.js (stompedCount): first stomp
+  // half-flattens (shorter + angry-fast), second stomp flattens for good.
+  else if (e.type === 'dragon') {
+    if ((e.hits | 0) === 0) { e.hits = 1; e.h = 14; e.vx = (e.vx < 0 ? -1 : 1) * 0.9; addScore(100, e.x, e.y - 16); }
+    else { e.hits = 2; e.dead = true; e.flat = true; e.deadT = 0; e.vx = 0; addScore(200, e.x, e.y - 16); }
+  }
   Audio.sfx.stomp();
 }
 function overlaps(a, b) {
@@ -1308,7 +1501,7 @@ function updateEntities() {
       continue;
     }
     switch (e.type) {
-      case 'goomba': case 'koopa': {
+      case 'goomba': case 'koopa': case 'dragon': {
         e.vy = Math.min(4.5, e.vy + 0.4);
         const hit = moveX(e); if (hit) e.vx = -e.vx;
         // Patrol limits, after jipham510's AutoMove behavior: turn around
@@ -1316,6 +1509,21 @@ function updateEntities() {
         if (e.x1 !== undefined && e.x < e.x1) { e.x = e.x1; e.vx = Math.abs(e.vx); }
         if (e.x2 !== undefined && e.x > e.x2) { e.x = e.x2; e.vx = -Math.abs(e.vx); }
         moveY(e);
+        e.anim++;
+        break;
+      }
+      case 'bullet': {
+        // Gravity-free flyer, after jipham510's Bullet (IgnoreGravity +
+        // AutoMove): straight left until far behind its start, then culled.
+        // A stomped (falling) bullet drops with gravity and bursts on land.
+        if (e.falling) {
+          e.vy = Math.min(4.5, e.vy + 0.4);
+          e.x += e.vx;
+          if (moveY(e) === 'ground') { Game.particles.push({ kind: 'boom', x: e.x, y: e.y, t: 0 }); e.remove = true; Audio.sfx.kick(); }
+        } else {
+          e.x += e.vx;
+          if (e.x < e.x0 - 1200) e.remove = true;
+        }
         e.anim++;
         break;
       }
@@ -1396,7 +1604,9 @@ function updateEntities() {
         continue;
       }
       if (falling) {
-        stompKill(e); m.vy = keys.jump ? -5 : -3.5; m.jumping = keys.jump; m.y = e.y - e.h;
+        // True SMW bounce BoostMarioSpeed (sprite_1-main.s:5576): -48 =
+        // -3.0 px/f, or -88 = -5.5 px/f while holding jump.
+        stompKill(e); m.vy = keys.jump ? -5.5 : -3.0; m.jumping = keys.jump; m.y = e.y - e.h;
       } else {
         damageMario();
       }
@@ -1543,6 +1753,15 @@ function drawHUD() {
   drawText('WORLD', 144, 8); drawText(' 1-1', 144, 16);
   drawText('TIME', 200, 8); drawText(pad(Game.time, 3), 204, 16);
   if (Audio.muted) drawText('MUTE', 200, 26, '#ff8');
+  // P-meter (wm_PlayerDashTimer $13E4): bar fills as Mario runs with B;
+  // full bar + run = sprint speed. Flashes when full, like the original.
+  const full = mario.meter >= PH.meterMax;
+  if (!full || (Game.frame & 8)) {
+    drawText('P', 24, 26, full ? '#f8d838' : '#fff');
+    ctx.fillStyle = '#000'; ctx.fillRect(32, 27, 30, 5);
+    ctx.fillStyle = full ? '#f8d838' : '#f83800';
+    ctx.fillRect(33, 28, 28 * mario.meter / PH.meterMax, 3);
+  }
 }
 function drawBackground() {
   const cx = Game.camX;
@@ -1640,6 +1859,12 @@ function drawEntities() {
     if (e.type === 'goomba') img = e.flat ? SPR.goomba.R[1] : (((e.anim >> 3) & 1) ? SPR.goomba.R[0] : SPR.goomba.L[0]);
     else if (e.type === 'koopa') img = (e.vx > 0 ? SPR.koopa.R : SPR.koopa.L)[(e.anim >> 3) & 1];
     else if (e.type === 'shell') img = SPR.shell;
+    else if (e.type === 'bullet') img = SPR.bullet;
+    else if (e.type === 'dragon') {
+      if (e.flat) img = SPR.dragonFlat;
+      else if ((e.hits | 0) === 1) img = (e.vx > 0 ? SPR.dragonHalf.R : SPR.dragonHalf.L)[(e.anim >> 4) & 1];
+      else img = (e.vx > 0 ? SPR.dragon.R : SPR.dragon.L)[(e.anim >> 3) & 1];
+    }
     else if (e.type === 'item') {
       img = e.kind === 'mush' ? SPR.mush : e.kind === '1up' ? SPR.oneup : e.kind === 'flower' ? SPR.flower : SPR.star;
       if (e.rise > 0) { // clip to the block it emerges from
@@ -1671,18 +1896,20 @@ function render() {
   const s = Game.state;
   if (s === 'title') {
     drawBackground(); drawTiles();
-    // logo box
-    ctx.fillStyle = '#c84c0c'; ctx.fillRect(40, 32, 176, 72);
-    ctx.fillStyle = '#f8b878'; ctx.fillRect(44, 36, 168, 64);
-    ctx.fillStyle = '#c84c0c'; ctx.fillRect(48, 40, 160, 56);
+    // logo box (pushed below the P-meter HUD row)
+    ctx.fillStyle = '#c84c0c'; ctx.fillRect(40, 38, 176, 72);
+    ctx.fillStyle = '#f8b878'; ctx.fillRect(44, 42, 168, 64);
+    ctx.fillStyle = '#c84c0c'; ctx.fillRect(48, 46, 160, 56);
     ctx.font = 'bold 16px monospace'; ctx.fillStyle = '#fff'; ctx.textBaseline = 'top';
-    let w = ctx.measureText('SUPER').width; ctx.fillText('SUPER', (W - w) / 2, 44);
-    w = ctx.measureText('MARIO BROS.').width; ctx.fillText('MARIO BROS.', (W - w) / 2, 64);
-    centerText('WORLD 1-1  REMAKE', 84, '#f8d838');
+    let w = ctx.measureText('SUPER').width; ctx.fillText('SUPER', (W - w) / 2, 50);
+    w = ctx.measureText('MARIO BROS.').width; ctx.fillText('MARIO BROS.', (W - w) / 2, 70);
+    centerText('WORLD 1-1  SMW PACK', 90, '#f8d838');
     ctx.drawImage(SPR.small.R[0], 40, 13 * T - 16);
     if ((Game.frame >> 5) & 1) centerText('PRESS ENTER / TAP TO START', 140, '#fff');
-    centerText('Z:RUN/FIRE  X:JUMP  ARROWS:MOVE', 160, '#fff');
-    centerText('TOP- ' + pad(Game.best || 0, 6), 184, '#fff');
+    centerText('Z:RUN/FIRE  X:JUMP  ARROWS:MOVE', 156, '#fff');
+    centerText('HOLD RUN: FILL P = SPRINT 3.0', 166, '#f8d838');
+    centerText('BULLET+DRAGON  SHIFT+CLICK:PIPE', 176, '#f8d838');
+    centerText('TOP- ' + pad(Game.best || 0, 6), 188, '#fff');
     drawHUD();
     return;
   }
