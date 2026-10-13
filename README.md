@@ -1,8 +1,8 @@
-# 🍄 SUPER FABLE BROS. — World 1-1
+# 🍄 SUPER FABLE WORLD — Yoshi's Island 2
 
 ### *One-shotted by **Claude Fable 5.1** — not 5. The point-one is the whole point.*
 
-> **Super Mario Bros. World 1-1, remade in ONE single HTML file. Zero dependencies. Zero assets. Zero build step.**
+> **Super Mario World: Yoshi's Island 2, remade in ONE single HTML file. Zero dependencies. Zero assets. Zero build step.**
 > Every sprite, every tile, every note of the soundtrack — synthesized from raw code, by a model, in one session.
 
 <p align="center">
@@ -36,9 +36,12 @@
 
 ## What is this?
 
-The entire World 1-1 experience — the level layout, physics, enemies, power-ups,
-the iconic overworld theme — packed into a single `index.html` you can open by
+Yoshi's Island 2 from Super Mario World — the meadow start, mesa hops,
+turn-block bridge, staircase hill, midway gate, pipe flats and step hills
+to the goal — packed into a single `index.html` you can open by
 double-clicking. No `npm install`. No sprite sheets. No `.mp3` files. Just open it.
+The level map and SMW sprite sheets were studied as visual reference; every
+pixel you see is still hand-encoded ASCII bitmaps rendered to canvas.
 
 **One-shotted by `claude-fable-5-1` — that's Fable 5.1, mind the minor version.**
 The whole game was produced by the model in a single coding session — no human wrote
@@ -47,13 +50,13 @@ in one take.
 
 ## Features
 
-- 🗺️ **Faithful 1-1 layout** — pipes, pits, staircases, the multi-coin block, hidden 1-UP energy, flagpole & castle finish
-- 🏃 **Real SMB-style physics** — run momentum, skid, variable-height jumps, crouching
-- 🍄 **Full power-up chain** — Small → Super → Fire Mario (yes, you can throw fireballs), Starman invincibility, 1-UP mushrooms
-- 👾 **Enemies** — Goombas and Koopa Troopas, with stompable + kickable shells and combo scoring
+- 🗺️ **Yoshi's Island 2 layout** — message blocks, turn-block bridge over the first pit, staircase mesa, midway checkpoint gate, pipe flats, coin trails, 5 dragon coins (1UP), hidden 1-UP, flagpole & castle finish
+- 🏃 **True SMW physics** — P-meter sprint, speed-indexed jumps, cape takeoff/glide/dive, spin jumps, walljump, skid smoke, −1 trick, corner boosts, shell carrying, swimming
+- 🍄 **Full power-up chain** — Small → Big → Cape (feather) or Fire (flower), Starman invincibility, 1-UP mushrooms
+- 👾 **Enemies** — Goombas, green + red Koopas (red never walks off ledges), 2-hit purple Rexes, Bullet Bills, stompable + kickable + carryable shells
 - 🎵 **Chiptune synth engine** — the overworld theme and all SFX (coin, stomp, fireball, flagpole fanfare, hurry-up speedup at 100s) generated live with the WebAudio API. Not a single audio file
-- 🎨 **Hand-encoded pixel art** — every sprite is a string-encoded bitmap rendered to canvas, palette-swapped for Fire Mario and 1-UPs
-- 📱 **Touch controls** — virtual D-pad + A/B buttons appear automatically on mobile
+- 🎨 **Hand-encoded pixel art** — every sprite is a string-encoded bitmap rendered to canvas: SMW grass-topped ground, turn/message blocks, dragon coins, Rex, red shells, cape drape
+- 📱 **Touch controls** — virtual D-pad + A/B/SPIN buttons appear automatically on mobile
 - ⏸️ Pause, mute, lives, score, coin counter, 400-second timer — the whole HUD
 
 ## Controls
@@ -90,10 +93,16 @@ Or just play the hosted version: **https://inonono66.github.io/fable-5.1-mario/*
 | Spawns | Camera-trigger thresholds + patrol bounds per enemy (idea from jipham510, see References) |
 | Collision | Swept last-position guards so fast bodies can't tunnel (idea from jipham510 `Tile_Collision`) |
 | Background | Clouds on a 0.5× parallax layer (idea from CharlesStover's `mario.js` controller) |
-| SMW enemies | Bullet Bill (gravity-free flyer, stomp grounds it, bursts on landing) and Dragon (2-hit dino: half-flatten + speeds up, then flat) — behaviors after jipham510's `Bullet.js`/`Dragon.js`, sprites hand-encoded to match |
+| SMW enemies | Bullet Bill (gravity-free flyer, stomp grounds it, bursts on landing), Dragon + purple Rex (2-hit dinos: half-flatten + speeds up, then flat), red Koopas (fast, never walk off ledges) — behaviors after jipham510's `Bullet.js`/`Dragon.js`, sprites hand-encoded from the SMW sheets to match |
+| YI2 systems | Turn blocks (unbreakable bridges), message blocks with text, midway checkpoint gate with tape-drop, floating coins + 5 dragon coins (1UP), grass-topped mesa cliffs |
 | Build mode | `Shift+Click` places a 2-wide pipe at the cursor (height follows click row) — after CharlesStover's `ADD_TUBE` click handler; only builds on empty tiles |
-| Level data | Ground stretches + spawn list live in one `LEVEL_DATA` table (ground ranges, `[tx, type, row]` spawns) — after jipham510's JSON range level parser |
+| Level data | Ground stretches + spawn list + pickup trails + midway live in one `LEVEL_DATA` table — after jipham510's JSON range level parser |
 | True physics | Walk 1.25 / run 2.25 / sprint 3.0 px/f caps, P-meter (−1/+2, full at 112), speed-indexed jump table (−5.0…−6.06), held/released gravity 0.19/0.375, terminal 4.0, stomp bounce −3.0/−5.5 — exact values from the [galaxyhaxz/smw-src](https://github.com/galaxyhaxz/smw-src) disassembly (`player.s` tables `DATA_00D535`/`00D5EB`/`00D2BD`/`00D7A5`/`00D7AF`, `BoostMarioSpeed`) |
+| SMW movement | 16-bit-style accel (0.094 walk / 0.125 run, 0.7× air control), skid smoke + turning pose, −1 trick kick, wall slide/catch + walljump + airborne bonk (±2.0 rebound, −2.0 pop-up), corner-boost nudge, landing dust |
+| Spin jump | `C`/`V` — higher jump-table entry, poofs foes with a −0.5 hop instead of stomping (true `$F8` bounce) |
+| Cape | Feather item → Cape Mario; P-speed jump arms takeoff meter 80, ascend phase, then glide (hold jump = 1.0 float cap), dive (`↓` banks speed + swoop lift), cape drape sprite + HUD takeoff gauge |
+| Water | Full swim physics in-engine (strokes, surface leap −5.0, 1.5 swim cap; fire dies in water) — Yoshi's Island 2 itself has no pools, so its pits are real pits; water tiles remain for custom builds |
+| Carry | Hold run to grab idle shells, run-button to throw (3.25), carried shells kill on touch |
 
 ## References
 
